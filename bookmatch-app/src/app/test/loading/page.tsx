@@ -54,7 +54,7 @@ export default function TestLoadingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-white to-background flex items-center justify-center">
-      <main className="text-center px-6">
+      <main className="w-full max-w-sm text-center px-6">
         {/* Animated Icon */}
         <div className="relative mb-8">
           {/* Sparkles */}
@@ -103,7 +103,7 @@ export default function TestLoadingPage() {
         </div>
 
         {/* Progress Bar */}
-        <div className="w-64 mx-auto">
+        <div className="mx-auto w-full max-w-xs">
           <Progress value={progress} className="h-2" />
           <p className="text-sm text-gray-400 mt-2">{Math.round(progress)}% 완료</p>
         </div>

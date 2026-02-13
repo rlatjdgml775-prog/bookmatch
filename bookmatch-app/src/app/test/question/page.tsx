@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useUserStore } from '@/store';
 import { TEST_QUESTIONS, TOTAL_QUESTIONS } from '@/data';
 import type { TestAnswer } from '@/types';
@@ -16,11 +14,20 @@ export default function TestQuestionPage() {
   const { testAnswers, currentQuestionIndex, addTestAnswer, setCurrentQuestionIndex, resetTest } =
     useUserStore();
 
-  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const currentQuestion = TEST_QUESTIONS[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / TOTAL_QUESTIONS) * 100;
+
+  const handleGoBack = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      return;
+    }
+    // 첫 문항이면 테스트 시작 화면으로 이동
+    resetTest();
+    router.push('/test/start');
+  };
 
   const handleSelectOption = (option: 'A' | 'B') => {
     if (isAnimating) return;
@@ -48,52 +55,15 @@ export default function TestQuestionPage() {
     }, 300);
   };
 
-  const handleGoBack = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-
-  const handleExit = () => {
-    resetTest();
-    router.push('/');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-white/90 px-4 py-3 backdrop-blur">
-        <button
-          onClick={handleGoBack}
-          disabled={currentQuestionIndex === 0}
-          className="p-2 -ml-2 disabled:opacity-30"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="font-medium text-gray-600">
-          {currentQuestionIndex + 1} / {TOTAL_QUESTIONS}
-        </span>
-        <button onClick={() => setIsExitModalOpen(true)} className="p-2 -mr-2">
-          <X className="w-5 h-5" />
-        </button>
-      </header>
-
       {/* Progress */}
-      <div className="px-4 pt-2">
-        <Progress value={progress} className="h-2" />
-        <div className="flex justify-center gap-1 mt-3">
-          {TEST_QUESTIONS.map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                idx < currentQuestionIndex
-                  ? 'bg-primary'
-                  : idx === currentQuestionIndex
-                  ? 'bg-primary animate-pulse'
-                  : 'bg-gray-300'
-              }`}
-            />
-          ))}
+      <div className="sticky top-0 z-10 bg-white/90 px-4 py-4 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={handleGoBack} className="p-2 -ml-2" aria-label="뒤로가기">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <Progress value={progress} className="h-2 flex-1" />
         </div>
       </div>
 
@@ -141,28 +111,6 @@ export default function TestQuestionPage() {
           </div>
         </div>
       </main>
-
-      {/* Exit Modal */}
-      <Dialog open={isExitModalOpen} onOpenChange={setIsExitModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>테스트를 그만두시겠어요?</DialogTitle>
-          </DialogHeader>
-          <p className="text-gray-600 py-4">
-            지금 나가면 진행 상황이 저장되지 않아요.
-            <br />
-            정말 나가시겠어요?
-          </p>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsExitModalOpen(false)} className="flex-1">
-              계속하기
-            </Button>
-            <Button variant="destructive" onClick={handleExit} className="flex-1">
-              나가기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

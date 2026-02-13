@@ -51,11 +51,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="sticky top-0 border-b bg-white/90 backdrop-blur">
-        <Link href="/" className="p-2 -ml-2">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="flex-1 text-center font-bold">로그인</h1>
-        <div className="w-9" />
+        <div className="mx-auto flex max-w-md items-center px-4 py-3">
+          <Link href="/" className="-ml-2 p-2">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="flex-1 text-center font-bold">로그인</h1>
+          <div className="w-9" />
+        </div>
       </header>
 
       <main className="max-w-md mx-auto px-4 py-8">

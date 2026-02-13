@@ -28,11 +28,12 @@ function coverGradientClass(book: Book) {
 export default function BookDetailPage() {
   const params = useParams<{ id: string }>();
   const { user } = useUserStore();
-  const { addToWishlist, isInWishlist, evaluateBook } = useBookStore();
+  const { addToWishlist, isInWishlist, evaluateBook, getBookFeedback } = useBookStore();
 
   const book = useMemo(() => getBookById(params.id), [params.id]);
   const mbti = (user?.mbtiType ?? "DELF") as ReadingMBTIType;
   const inWishlist = book ? isInWishlist(book.id) : false;
+  const feedback = book ? getBookFeedback(book.id) : null;
 
   const [evaluationOpen, setEvaluationOpen] = useState(false);
 
@@ -83,15 +84,25 @@ export default function BookDetailPage() {
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader variant="back-share" backLabel="뒤로" onShare={handleShare} />
 
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:max-w-4xl">
         {/* Cover */}
         <div className="mb-8 text-center">
-          <div
-            className={`mx-auto mb-4 flex h-56 w-40 items-center justify-center rounded-xl bg-gradient-to-b shadow-xl ${coverGradientClass(
-              book
-            )}`}
-          >
-            <span className="text-6xl">{book.emoji ?? "📘"}</span>
+          <div className="mx-auto mb-4 h-56 w-40 overflow-hidden rounded-xl bg-gray-100 shadow-xl">
+            {book.coverImage ? (
+              <img
+                src={book.coverImage}
+                alt={book.title}
+                className="h-full w-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            ) : (
+              <div
+                className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${coverGradientClass(book)}`}
+              >
+                <span className="text-6xl">{book.emoji ?? "📘"}</span>
+              </div>
+            )}
           </div>
           <h1 className="mb-1 text-2xl font-bold">{book.title}</h1>
           <p className="text-gray-500">
@@ -187,30 +198,47 @@ export default function BookDetailPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => addToWishlist(book.id)}
             disabled={inWishlist}
-            className={`flex-1 rounded-xl border-2 py-4 font-semibold transition ${
+            className={`min-w-0 flex-1 rounded-xl border-2 py-3 text-sm font-semibold transition sm:py-4 sm:text-base ${
               inWishlist
                 ? "border-gray-300 text-gray-400"
                 : "border-primary text-primary hover:bg-indigo-50"
             }`}
           >
-            <span className="inline-flex items-center justify-center gap-2">
-              <span>{inWishlist ? "💖" : "❤️"}</span>
-              <span>{inWishlist ? "추가됨" : "위시리스트 추가"}</span>
+            <span className="inline-flex min-w-0 items-center justify-center gap-2">
+              <span className="hidden sm:inline">{inWishlist ? "💖" : "❤️"}</span>
+              <span className="truncate">{inWishlist ? "추가됨" : "위시리스트 추가"}</span>
             </span>
           </button>
           <button
             type="button"
             onClick={() => setEvaluationOpen(true)}
-            className="flex-1 rounded-xl bg-primary py-4 font-semibold text-white transition hover:bg-indigo-700"
+            disabled={!!feedback}
+            className={`min-w-0 flex-1 rounded-xl py-3 text-sm font-semibold text-white transition sm:py-4 sm:text-base ${
+              feedback ? "bg-gray-300" : "bg-primary hover:bg-indigo-700"
+            }`}
           >
-            <span className="inline-flex items-center justify-center gap-2">
-              <span>✅</span>
-              <span>읽었어요</span>
+            <span className="inline-flex min-w-0 items-center justify-center gap-2">
+              {feedback === "like" ? (
+                <>
+                  <span className="hidden sm:inline">👍</span>
+                  <span className="truncate">좋았어요</span>
+                </>
+              ) : feedback === "dislike" ? (
+                <>
+                  <span className="hidden sm:inline">👎</span>
+                  <span className="truncate">별로예요</span>
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">✅</span>
+                  <span className="truncate">읽었어요</span>
+                </>
+              )}
             </span>
           </button>
         </div>

@@ -1,11 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { Button } from "@/components/ui/button";
+import { useUserStore } from "@/store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function YearlyReportPage() {
-  const [goal, setGoal] = useState(30);
+  const { readingGoal2025, setReadingGoal2025, readingGoal2025HasBeenSet, setReadingGoal2025HasBeenSet } =
+    useUserStore();
+  const [goal, setGoal] = useState(readingGoal2025);
+  const [isEditingGoal, setIsEditingGoal] = useState(!readingGoal2025HasBeenSet);
+  const [isGoalAlertOpen, setIsGoalAlertOpen] = useState(false);
+  const [pendingGoal, setPendingGoal] = useState<number>(readingGoal2025);
+
+  useEffect(() => {
+    setGoal(readingGoal2025);
+  }, [readingGoal2025]);
+
+  useEffect(() => {
+    // 목표를 한 번이라도 설정한 뒤에는 기본적으로 요약 상태로 보여줌
+    if (readingGoal2025HasBeenSet) setIsEditingGoal(false);
+  }, [readingGoal2025HasBeenSet]);
+
+  const isDirty = useMemo(() => goal !== readingGoal2025, [goal, readingGoal2025]);
 
   const shareReport = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -35,7 +60,7 @@ export default function YearlyReportPage() {
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader variant="back-share" backLabel="뒤로" onShare={shareReport} />
 
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:max-w-4xl">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold">✨ 2024 연말 독서 결산 ✨</h1>
           <p className="mt-2 text-gray-500">
@@ -66,7 +91,7 @@ export default function YearlyReportPage() {
             <span>📈</span>
             <span>2024년 독서 요약</span>
           </h2>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl bg-indigo-50 p-3 text-center">
               <p className="mb-1 text-xs text-gray-500">총 권수</p>
               <p className="text-xl font-bold text-primary">24권</p>
@@ -152,37 +177,80 @@ export default function YearlyReportPage() {
         </section>
 
         {/* Goal */}
-        <section className="mb-6 rounded-2xl bg-white p-6 shadow-md">
+        <section id="goal-2025" className="mb-6 scroll-mt-24 rounded-2xl bg-white p-6 shadow-md">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
             <span>🎯</span>
             <span>2025년 독서 목표 설정</span>
           </h2>
-          <div className="rounded-xl bg-gray-50 p-4 text-center">
-            <p className="mb-4 text-gray-600">2025년 목표 권수를 설정해보세요</p>
-            <div className="mb-4 flex items-center justify-center gap-4">
-              <button
+          {isEditingGoal ? (
+            <div className="rounded-xl bg-gray-50 p-4 text-center">
+              <p className="mb-4 text-gray-600">2025년 목표 권수를 설정해보세요</p>
+              <div className="mb-4 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setGoal((g) => Math.max(1, g - 1))}
+                  className="h-10 w-10 rounded-full bg-gray-200 text-xl transition hover:bg-gray-300"
+                  aria-label="목표 권수 1 감소"
+                >
+                  -
+                </button>
+                <span className="text-4xl font-bold text-primary">{goal}</span>
+                <span className="text-xl text-gray-400">권</span>
+                <button
+                  type="button"
+                  onClick={() => setGoal((g) => g + 1)}
+                  className="h-10 w-10 rounded-full bg-gray-200 text-xl transition hover:bg-gray-300"
+                  aria-label="목표 권수 1 증가"
+                >
+                  +
+                </button>
+              </div>
+              <p className="mb-4 text-sm text-gray-500">💡 2024년보다 6권 더 많은 도전이에요!</p>
+              <Button
                 type="button"
-                onClick={() => setGoal((g) => Math.max(1, g - 1))}
-                className="h-10 w-10 rounded-full bg-gray-200 text-xl transition hover:bg-gray-300"
+                className="w-full py-6 hover:bg-indigo-700"
+                disabled={!isDirty}
+                onClick={() => {
+                  setPendingGoal(goal);
+                  setIsGoalAlertOpen(true);
+                }}
               >
-                -
-              </button>
-              <span className="text-4xl font-bold text-primary">{goal}</span>
-              <span className="text-xl text-gray-400">권</span>
-              <button
-                type="button"
-                onClick={() => setGoal((g) => g + 1)}
-                className="h-10 w-10 rounded-full bg-gray-200 text-xl transition hover:bg-gray-300"
-              >
-                +
-              </button>
+                목표 설정하기
+              </Button>
             </div>
-            <p className="mb-4 text-sm text-gray-500">💡 2024년보다 6권 더 많은 도전이에요!</p>
-            <Button className="w-full py-6 hover:bg-indigo-700">목표 설정하기</Button>
-            <button type="button" className="mt-3 text-sm text-gray-400 hover:underline">
-              나중에 설정할게요
-            </button>
-          </div>
+          ) : (
+            <div className="rounded-xl bg-gray-50 p-4 text-center">
+              <p className="text-gray-700">
+                2025년 목표 권수는 <span className="font-bold text-primary">{readingGoal2025}권</span>으로
+                설정하셨네요.
+              </p>
+              <p className="mt-2 text-sm text-gray-500">💡 2024년보다 6권 더 많은 도전이에요!</p>
+              <Button type="button" className="mt-4 w-full py-6 hover:bg-indigo-700" onClick={() => setIsEditingGoal(true)}>
+                목표 수정하기
+              </Button>
+            </div>
+          )}
+
+          <AlertDialog open={isGoalAlertOpen} onOpenChange={setIsGoalAlertOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{pendingGoal}권으로 목표 설정 되었습니다!</AlertDialogTitle>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="sm:justify-center">
+                <AlertDialogAction
+                  className="w-full sm:w-48"
+                  onClick={() => {
+                    setReadingGoal2025(pendingGoal);
+                    setReadingGoal2025HasBeenSet(true);
+                    setIsGoalAlertOpen(false);
+                    setIsEditingGoal(false);
+                  }}
+                >
+                  확인
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </section>
 
         <div className="space-y-3">

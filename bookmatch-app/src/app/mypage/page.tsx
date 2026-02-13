@@ -1,28 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Minus, Plus } from "lucide-react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { BottomNav } from "@/components/app/BottomNav";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useBookStore, useUserStore } from "@/store";
 import { READING_TYPES } from "@/data";
 import type { ReadingMBTIType } from "@/types";
 
-function formatJoinDate(date: Date | undefined) {
-  const d = date ?? new Date("2024-01-01T00:00:00");
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+function formatJoinDate(date: unknown) {
+  // zustand persist로 저장된 Date는 복원 시 string이 될 수 있어 런타임 변환이 필요합니다.
+  const fallback = new Date("2024-01-01T00:00:00");
+
+  const d =
+    date instanceof Date
+      ? date
+      : typeof date === "string" || typeof date === "number"
+        ? new Date(date)
+        : fallback;
+
+  const safe = Number.isNaN(d.getTime()) ? fallback : d;
+
+  const y = safe.getFullYear();
+  const m = String(safe.getMonth() + 1).padStart(2, "0");
+  const day = String(safe.getDate()).padStart(2, "0");
   return `${y}.${m}.${day}`;
 }
 
 export default function MyPage() {
   const router = useRouter();
-  const { user, logout } = useUserStore();
+  const { user, logout, readingGoal2025, setReadingGoal2025, setReadingGoal2025HasBeenSet } = useUserStore();
   const { wishlist, getReadingStats } = useBookStore();
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [goalDraft, setGoalDraft] = useState<number>(readingGoal2025);
 
   const nickname = user?.nickname ?? "책읽는독서가";
   const email = user?.email ?? "example@email.com";
@@ -30,16 +52,22 @@ export default function MyPage() {
   const mbtiTitle = READING_TYPES[mbti]?.title ?? READING_TYPES.DELF.title;
 
   const stats = getReadingStats();
-  const goal = 30;
+  const goal = readingGoal2025;
   const currentMonthCount = 2;
   const completed = stats.completedBooks || 24;
   const progressPercent = useMemo(() => Math.min(100, Math.round((currentMonthCount / goal) * 100)), [goal]);
+  const isGoalDirty = useMemo(() => goalDraft !== readingGoal2025, [goalDraft, readingGoal2025]);
+
+  useEffect(() => {
+    if (!isGoalModalOpen) return;
+    setGoalDraft(readingGoal2025);
+  }, [isGoalModalOpen, readingGoal2025]);
 
   return (
     <div className="bg-background text-foreground pb-20">
       <AppHeader variant="logo-actions" avatarText={nickname.charAt(0)} />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 lg:max-w-4xl">
         {/* Profile */}
         <section className="mb-6 rounded-2xl bg-white p-6 shadow-md">
           <div className="mb-4 flex items-center gap-4">
@@ -93,7 +121,11 @@ export default function MyPage() {
                 <span>🎯</span>
                 <span className="font-medium">2025년 목표: {goal}권</span>
               </div>
-              <button type="button" className="text-sm text-primary hover:underline">
+              <button
+                type="button"
+                className="text-sm text-primary hover:underline"
+                onClick={() => setIsGoalModalOpen(true)}
+              >
                 수정
               </button>
             </div>
@@ -105,6 +137,81 @@ export default function MyPage() {
             </p>
           </div>
         </section>
+
+        <Dialog open={isGoalModalOpen} onOpenChange={setIsGoalModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>2025년 독서 목표 설정</DialogTitle>
+              <DialogDescription>목표 권수를 수정하고 저장할 수 있어요.</DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full"
+                  onClick={() => setGoalDraft((g) => Math.max(1, g - 1))}
+                  aria-label="목표 권수 1 감소"
+                >
+                  <Minus className="h-5 w-5" />
+                </Button>
+
+                <div className="flex items-end gap-2">
+                  <span className="text-4xl font-extrabold text-primary tabular-nums">{goalDraft}</span>
+                  <span className="pb-1 text-base text-gray-500">권</span>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full"
+                  onClick={() => setGoalDraft((g) => g + 1)}
+                  aria-label="목표 권수 1 증가"
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="mt-5">
+                <p className="mb-2 text-sm font-medium text-gray-700">직접 입력</p>
+                <Input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={String(goalDraft)}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d]/g, "");
+                    const n = raw === "" ? 1 : Number(raw);
+                    setGoalDraft(Number.isFinite(n) ? Math.max(1, n) : 1);
+                  }}
+                  className="h-12 rounded-xl bg-white"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-center">
+              <div className="grid w-full grid-cols-2 gap-3 sm:w-auto">
+                <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={() => setIsGoalModalOpen(false)}>
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  className="h-12 rounded-xl hover:bg-indigo-700"
+                  disabled={!isGoalDirty}
+                  onClick={() => {
+                    setReadingGoal2025(goalDraft);
+                    setReadingGoal2025HasBeenSet(true);
+                    setIsGoalModalOpen(false);
+                  }}
+                >
+                  저장
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Menu */}
         <section className="mb-6 overflow-hidden rounded-2xl bg-white shadow-md">
@@ -161,10 +268,6 @@ export default function MyPage() {
 
           {[
             { emoji: "👤", label: "프로필 수정" },
-            { emoji: "🔔", label: "알림 설정" },
-            { emoji: "📄", label: "이용약관" },
-            { emoji: "🔒", label: "개인정보처리방침" },
-            { emoji: "❓", label: "고객센터/문의" },
           ].map((item) => (
             <button
               key={item.label}

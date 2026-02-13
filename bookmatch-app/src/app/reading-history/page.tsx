@@ -60,11 +60,13 @@ const FALLBACK: Array<{
 
 export default function ReadingHistoryPage() {
   const { user } = useUserStore();
-  const { readingRecords } = useBookStore();
+  const { readingRecords, hasHydrated } = useBookStore();
 
   const [filter, setFilter] = useState<FilterType>("all");
 
   const displayRecords = useMemo<DisplayRecord[]>(() => {
+    if (!hasHydrated) return [];
+
     const fromStore = readingRecords
       .filter((r) => r.status === "completed" && !!r.endDate && !!r.feedback)
       .map((r) => {
@@ -90,7 +92,7 @@ export default function ReadingHistoryPage() {
       };
       return { record, book, date };
     });
-  }, [readingRecords]);
+  }, [hasHydrated, readingRecords]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return displayRecords;
@@ -110,15 +112,15 @@ export default function ReadingHistoryPage() {
     return entries.map(([key, items]) => ({ key, label: monthLabel(items[0]!.date), items }));
   }, [filtered]);
 
-  const total = displayRecords.length || 5;
-  const likeCount = displayRecords.filter((r) => r.record.feedback === "like").length || 4;
-  const dislikeCount = displayRecords.filter((r) => r.record.feedback === "dislike").length || 1;
+  const total = displayRecords.length;
+  const likeCount = displayRecords.filter((r) => r.record.feedback === "like").length;
+  const dislikeCount = displayRecords.filter((r) => r.record.feedback === "dislike").length;
 
   return (
     <div className="bg-background text-foreground pb-20">
       <AppHeader variant="logo-actions" avatarText={(user?.nickname ?? "책읽는독서가").charAt(0)} />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 lg:max-w-4xl">
         <div className="mb-6">
           <h1 className="flex items-center gap-2 text-xl font-bold">
             <span>📚</span>
@@ -178,12 +180,24 @@ export default function ReadingHistoryPage() {
                     className="block rounded-xl bg-white p-4 shadow-sm transition hover:shadow-md"
                   >
                     <div className="flex gap-4">
-                      <div
-                        className={`flex h-[88px] w-16 items-center justify-center rounded-lg bg-gradient-to-b shadow ${coverGradientClass(
-                          book
-                        )}`}
-                      >
-                        <span className="text-2xl">{book.emoji ?? "📘"}</span>
+                      <div className="h-[88px] w-16 overflow-hidden rounded-lg bg-gray-100 shadow">
+                        {book.coverImage ? (
+                          <img
+                            src={book.coverImage}
+                            alt={book.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${coverGradientClass(
+                              book
+                            )}`}
+                          >
+                            <span className="text-2xl">{book.emoji ?? "📘"}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-start justify-between">

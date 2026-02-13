@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,19 @@ import type { ReadingMBTIType } from '@/types';
 export default function LandingPage() {
   const [isTypesModalOpen, setIsTypesModalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<ReadingMBTIType | null>(null);
+  const typesResultRef = useRef<HTMLDivElement | null>(null);
 
   const previewTypes = useMemo<ReadingMBTIType[]>(
     () => ['DELF', 'DELS', 'DERF', 'DESF', 'DLRF', 'DLRS'],
     []
   );
+
+  useEffect(() => {
+    if (!isTypesModalOpen) return;
+    if (!selectedType) return;
+    // DialogContent(스크롤 컨테이너) 내부에서 결과 카드 위치로 스크롤
+    typesResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [isTypesModalOpen, selectedType]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -199,7 +207,13 @@ export default function LandingPage() {
       </footer>
 
       {/* 16 Types Modal */}
-      <Dialog open={isTypesModalOpen} onOpenChange={setIsTypesModalOpen}>
+      <Dialog
+        open={isTypesModalOpen}
+        onOpenChange={(open) => {
+          setIsTypesModalOpen(open);
+          if (!open) setSelectedType(null);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -223,24 +237,30 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {selectedType && (
-            <Card className="mt-4 p-4 bg-blue-50">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">{READING_TYPES[selectedType].emoji}</span>
-                <div>
-                  <span className="font-bold text-primary">{selectedType}</span>
-                  <p className="text-sm text-gray-600">{READING_TYPES[selectedType].shortTitle}</p>
+          <div ref={typesResultRef} id="types-result" className="scroll-mt-4">
+            {selectedType ? (
+              <Card className="mt-4 p-4 bg-blue-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">{READING_TYPES[selectedType].emoji}</span>
+                  <div>
+                    <span className="font-bold text-primary">{selectedType}</span>
+                    <p className="text-sm text-gray-600">{READING_TYPES[selectedType].shortTitle}</p>
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm text-gray-700 whitespace-pre-line">
-                {READING_TYPES[selectedType].description}
-              </p>
-            </Card>
-          )}
+                <p className="text-sm text-gray-700 whitespace-pre-line">
+                  {READING_TYPES[selectedType].description}
+                </p>
+              </Card>
+            ) : (
+              <Card className="mt-4 p-4 bg-slate-50">
+                <p className="text-sm text-slate-600">유형을 선택하면 여기에 결과가 표시돼요.</p>
+              </Card>
+            )}
+          </div>
 
           <div className="mt-6 text-center">
-            <Link href="/test/start">
-              <Button className="rounded-full px-8">내 유형 알아보기 →</Button>
+            <Link href="/test/start" className="inline-flex w-full max-w-xs">
+              <Button className="w-full rounded-full px-8">내 유형 알아보기 →</Button>
             </Link>
           </div>
         </DialogContent>

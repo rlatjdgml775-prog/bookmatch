@@ -2,11 +2,41 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, ReadingMBTIType, TestAnswer } from '@/types';
 
+function normalizeUser(user: User | null): User | null {
+  if (!user) return null;
+
+  const createdAtRaw = (user as unknown as { createdAt?: unknown }).createdAt;
+  const createdAt =
+    createdAtRaw instanceof Date
+      ? createdAtRaw
+      : typeof createdAtRaw === 'string' || typeof createdAtRaw === 'number'
+        ? new Date(createdAtRaw)
+        : user.createdAt;
+
+  const safeCreatedAt = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
+
+  // 요구사항: user.id를 현재 사용 중인 닉네임으로 사용
+  const id = user.nickname;
+
+  return { ...user, id, createdAt: safeCreatedAt };
+}
+
 interface UserState {
   // 사용자 정보
   user: User | null;
   isLoggedIn: boolean;
+
+  /** persist hydration 완료 여부 (SSR hydration mismatch 방지용) */
+  hasHydrated: boolean;
+  setHasHydrated: (hydrated: boolean) => void;
   
+  // 독서 목표
+  readingGoal2025: number;
+  setReadingGoal2025: (goal: number) => void;
+  /** 사용자가 2025 목표를 한 번이라도 설정했는지 */
+  readingGoal2025HasBeenSet: boolean;
+  setReadingGoal2025HasBeenSet: (hasBeenSet: boolean) => void;
+
   // 테스트 관련
   testAnswers: TestAnswer[];
   currentQuestionIndex: number;
@@ -29,23 +59,30 @@ export const useUserStore = create<UserState>()(
     (set, get) => ({
       user: null,
       isLoggedIn: false,
+      hasHydrated: false,
+      readingGoal2025: 30,
+      readingGoal2025HasBeenSet: false,
       testAnswers: [],
       currentQuestionIndex: 0,
 
-      setUser: (user) => set({ user, isLoggedIn: !!user }),
+      setHasHydrated: (hydrated) => set({ hasHydrated: !!hydrated }),
+      setUser: (user) => set({ user: normalizeUser(user), isLoggedIn: !!user }),
 
       login: (email, nickname) => {
         const user: User = {
-          id: crypto.randomUUID(),
+          id: nickname,
           email,
           nickname,
           createdAt: new Date(),
           completedTest: false,
         };
-        set({ user, isLoggedIn: true });
+        set({ user: normalizeUser(user), isLoggedIn: true });
       },
 
       logout: () => set({ user: null, isLoggedIn: false }),
+
+      setReadingGoal2025: (goal) => set({ readingGoal2025: Math.max(1, Math.floor(goal || 1)) }),
+      setReadingGoal2025HasBeenSet: (hasBeenSet) => set({ readingGoal2025HasBeenSet: !!hasBeenSet }),
 
       setMBTIType: (mbtiType) => {
         const { user } = get();
@@ -113,6 +150,15 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: 'bookmatch-user-storage',
+      skipHydration: true,
+      onRehydrateStorage: () => (state) => {
+        // persist로 복원된 값에서 Date/string 혼합, id 동기화 등을 정규화
+        if (state?.user) state.setUser(state.user);
+        // 목표 값이 비어있으면 기본값 보장
+        if (state && (state.readingGoal2025 as unknown) == null) state.setReadingGoal2025(30);
+        if (state && (state.readingGoal2025HasBeenSet as unknown) == null) state.setReadingGoal2025HasBeenSet(false);
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

@@ -3,6 +3,10 @@ import { persist } from 'zustand/middleware';
 import type { Book, WishlistItem, ReadingRecord, BookEvaluation } from '@/types';
 
 interface BookState {
+  /** persist hydration 완료 여부 (SSR hydration mismatch 방지용) */
+  hasHydrated: boolean;
+  setHasHydrated: (hydrated: boolean) => void;
+
   // 위시리스트
   wishlist: WishlistItem[];
   
@@ -18,6 +22,8 @@ interface BookState {
   addReadingRecord: (record: Omit<ReadingRecord, 'id'>) => void;
   updateReadingRecord: (id: string, updates: Partial<ReadingRecord>) => void;
   evaluateBook: (bookId: string, evaluation: BookEvaluation) => void;
+  /** 해당 책 평가(좋았어요/별로예요) 조회. 없으면 null */
+  getBookFeedback: (bookId: string) => ReadingRecord['feedback'] | null;
   
   // 통계
   getReadingStats: () => {
@@ -31,9 +37,11 @@ interface BookState {
 export const useBookStore = create<BookState>()(
   persist(
     (set, get) => ({
+      hasHydrated: false,
       wishlist: [],
       readingRecords: [],
 
+      setHasHydrated: (hydrated) => set({ hasHydrated: !!hydrated }),
       addToWishlist: (bookId) => {
         const { wishlist } = get();
         if (!wishlist.find((item) => item.bookId === bookId)) {
@@ -99,6 +107,12 @@ export const useBookStore = create<BookState>()(
         }
       },
 
+      getBookFeedback: (bookId) => {
+        const { readingRecords } = get();
+        const record = readingRecords.find((r) => r.bookId === bookId && r.status === 'completed' && !!r.feedback);
+        return record?.feedback ?? null;
+      },
+
       getReadingStats: () => {
         const { readingRecords } = get();
         return {
@@ -111,6 +125,10 @@ export const useBookStore = create<BookState>()(
     }),
     {
       name: 'bookmatch-book-storage',
+      skipHydration: true,
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

@@ -32,7 +32,7 @@ export default function MonthlyReportPage() {
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader variant="back-share" backLabel="뒤로" onShare={shareReport} />
 
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:max-w-4xl">
         <div className="mb-8 text-center">
           <h1 className="flex items-center justify-center gap-2 text-2xl font-bold">
             <span>📊</span>
@@ -188,7 +188,7 @@ export default function MonthlyReportPage() {
             <span>✨</span>
             <span>이번 달 회고를 바탕으로 한 다음 달 추천</span>
           </h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {[
               { title: "파친코", author: "이민진", emoji: "📕", cls: "from-red-100 to-red-200", tag: "안전한 선택", tagCls: "bg-indigo-100 text-primary" },
               { title: "구의 증명", author: "최진영", emoji: "📘", cls: "from-blue-100 to-blue-200", tag: "깊이있는 도전", tagCls: "bg-emerald-100 text-secondary" },

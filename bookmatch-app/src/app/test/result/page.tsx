@@ -8,16 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import { Share2, RefreshCw, ArrowRight, BookOpen } from 'lucide-react';
+import { RefreshCw, ArrowRight, BookOpen } from 'lucide-react';
 import { useUserStore } from '@/store';
 import { READING_TYPES, getBooksByMBTI, AXIS_DESCRIPTIONS } from '@/data';
-import { toast } from 'sonner';
 import type { ReadingMBTIType } from '@/types';
 
 export default function TestResultPage() {
   const router = useRouter();
-  const { user, testAnswers } = useUserStore();
+  const { user, testAnswers, resetTest } = useUserStore();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -68,7 +66,7 @@ export default function TestResultPage() {
 
   const axisScores = calculateAxisScores();
 
-  const getCoverBgClass = (coverColor: string): string => {
+  const getCoverBgClass = (coverColor?: string): string => {
     const map: Record<string, string> = {
       orange: 'bg-orange-100',
       purple: 'bg-purple-100',
@@ -81,29 +79,12 @@ export default function TestResultPage() {
       brown: 'bg-amber-100',
       black: 'bg-slate-900 text-white',
     };
-    return map[coverColor] ?? 'bg-slate-100';
-  };
-
-  const handleShare = async () => {
-    const shareText = `나의 독서 MBTI는 ${userMBTI}형!\n"${typeInfo.title}"\n\n나도 테스트하기 👉 [BookMatch]`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'BookMatch 독서 MBTI 결과',
-          text: shareText,
-        });
-      } catch (error) {
-        // 사용자가 공유를 취소한 경우
-      }
-    } else {
-      await navigator.clipboard.writeText(shareText);
-      toast.success('클립보드에 복사되었어요!');
-    }
+    return (coverColor ? map[coverColor] : undefined) ?? 'bg-slate-100';
   };
 
   const handleRetakeTest = () => {
-    router.push('/test/start');
+    resetTest();
+    router.push('/test/question');
   };
 
   return (
@@ -113,10 +94,7 @@ export default function TestResultPage() {
         <Link href="/" className="flex items-center">
           <Image src="/assets/logo.png" alt="BookMatch" width={124} height={28} className="h-7 w-auto" />
         </Link>
-        <Button variant="ghost" size="sm" onClick={handleShare}>
-          <Share2 className="w-4 h-4 mr-1" />
-          공유
-        </Button>
+        <div className="h-8 w-8" />
       </header>
 
       <main className="max-w-md mx-auto px-4 py-8">
@@ -162,6 +140,9 @@ export default function TestResultPage() {
             {axisScores.map((score, idx) => {
               const total = score.leftScore + score.rightScore;
               const leftPercent = total > 0 ? (score.leftScore / total) * 100 : 50;
+              const rightPercent = 100 - leftPercent;
+              const isLeftDominant = leftPercent >= rightPercent;
+              const dominantPercent = isLeftDominant ? leftPercent : rightPercent;
 
               return (
                 <div key={idx}>
@@ -176,8 +157,8 @@ export default function TestResultPage() {
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-primary to-secondary transition-all"
-                      style={{ width: `${leftPercent}%` }}
+                      className={`h-full transition-all ${isLeftDominant ? "bg-gradient-to-r from-primary to-secondary" : "ml-auto bg-gradient-to-l from-primary to-secondary"}`}
+                      style={{ width: `${dominantPercent}%` }}
                     />
                   </div>
                 </div>
@@ -200,7 +181,18 @@ export default function TestResultPage() {
                     book.coverColor
                   )}`}
                 >
-                  {book.emoji}
+                  {book.coverImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={book.coverImage}
+                      alt={book.title}
+                      className="h-full w-full object-cover rounded-lg"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    book.emoji
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <Badge variant="outline" className="mb-1 text-xs">
@@ -213,38 +205,24 @@ export default function TestResultPage() {
               </div>
             ))}
           </div>
-          <Link href="/main">
-            <Button className="w-full mt-4">
-              추천 도서 더 보기 <ArrowRight className="w-4 h-4 ml-1" />
+        </Card>
+
+        {/* Bottom Actions */}
+        <div className="mt-6 space-y-3 pb-4">
+          <Link href="/main" className="block">
+            <Button className="w-full h-14 rounded-2xl text-lg font-semibold">
+              추천 도서 더 보기 <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </Link>
-        </Card>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={handleRetakeTest} className="flex-1">
-            <RefreshCw className="w-4 h-4 mr-1" />
-            다시 테스트
-          </Button>
-          <Button variant="outline" onClick={handleShare} className="flex-1">
-            <Share2 className="w-4 h-4 mr-1" />
-            결과 공유
+          <Button
+            variant="outline"
+            onClick={handleRetakeTest}
+            className="w-full h-14 rounded-2xl text-lg font-semibold border-primary/40 text-primary hover:bg-primary/5"
+          >
+            <RefreshCw className="w-5 h-5 mr-2" />
+            테스트 다시하기
           </Button>
         </div>
-
-        {/* Share Card Preview */}
-        <Card className="mt-6 p-4 bg-gradient-to-br from-primary to-blue-700 text-white text-center">
-          <p className="text-sm opacity-80 mb-1">나의 독서 MBTI</p>
-          <p className="text-2xl font-bold tracking-wider mb-1">
-            {userMBTI.split('').join(' ')}
-          </p>
-          <p className="text-sm opacity-90">"{typeInfo.title}"</p>
-          <div className="mt-2 text-xs opacity-70">
-            {typeInfo.keywords.join(' ')}
-          </div>
-          <Separator className="my-3 bg-white/20" />
-          <p className="text-xs opacity-60">BookMatch 📚</p>
-        </Card>
       </main>
     </div>
   );

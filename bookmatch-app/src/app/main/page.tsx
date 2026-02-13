@@ -2,45 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Mic, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app/AppHeader";
 import { BottomNav } from "@/components/app/BottomNav";
 import { useUserStore } from "@/store";
 import { useBookStore } from "@/store";
-import { getBooksByMBTI } from "@/data";
+import { getBookById, getBooksByMBTI, SAMPLE_BOOKS } from "@/data";
 import { READING_TYPES } from "@/data";
-import type { Book, BookEvaluation, ReadingMBTIType } from "@/types";
-
-type RecommendationBadge = {
-  label: string;
-  className: string;
-};
-
-const BADGES: RecommendationBadge[] = [
-  { label: "1️⃣ 성향 일치", className: "bg-indigo-100 text-primary" },
-  { label: "2️⃣ 독자 만족", className: "bg-emerald-100 text-secondary" },
-  { label: "3️⃣ 새로운 발견", className: "bg-amber-100 text-accent" },
-];
-
-const EXPLAINS = [
-  {
-    className: "bg-indigo-50",
-    text: `💬 "당신이 좋아할 만한 따뜻한 성장 이야기예요. DELF형이 선호하는 '공감'과 '감동' 키워드가 87% 일치해요"`,
-  },
-  {
-    className: "bg-emerald-50",
-    text: `💬 "95%의 독자가 '감동적'이라고 평가했어요. 따뜻한 위로가 필요할 때 추천드려요"`,
-  },
-  {
-    className: "bg-amber-50",
-    text: `💬 "평소와 다른 장르지만, 당신이 좋아하는 '힐링'과 '따뜻함'이 담긴 책이에요. 새로운 발견이 될 거예요!"`,
-  },
-];
-
-function formatYear(book: Book) {
-  return book.year;
-}
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import type { Book, ReadingMBTIType } from "@/types";
 
 function coverGradientClass(book: Book) {
   const c = book.coverColor ?? "orange";
@@ -58,204 +30,266 @@ function coverGradientClass(book: Book) {
   return map[c] ?? "from-slate-100 to-slate-200";
 }
 
+function bookSubtitle(book: Book) {
+  return book.author ? `저자 ${book.author}` : "추천 도서";
+}
+
+function parseDateMs(value: unknown): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  return 0;
+}
+
 export default function MainPage() {
   const { user } = useUserStore();
-  const { wishlist, addToWishlist, isInWishlist, evaluateBook, getReadingStats } = useBookStore();
+  const { readingRecords, wishlist, getReadingStats } = useBookStore();
 
-  const nickname = user?.nickname ?? "책읽는독서가";
+  const nickname = user?.nickname ?? "독서왕";
   const mbti = (user?.mbtiType ?? "DELF") as ReadingMBTIType;
   const mbtiTitle = READING_TYPES[mbti]?.title ?? READING_TYPES.DELF.title;
 
-  const recommendations = useMemo(() => getBooksByMBTI(mbti).slice(0, 3), [mbti]);
+  const [query, setQuery] = useState("");
+
+  const recommendations = useMemo(() => {
+    const base = getBooksByMBTI(mbti);
+    const ids = new Set<string>();
+    const result: Book[] = [];
+
+    for (const b of base) {
+      if (result.length >= 3) break;
+      if (ids.has(b.id)) continue;
+      ids.add(b.id);
+      result.push(b);
+    }
+
+    if (result.length < 3) {
+      const fill = SAMPLE_BOOKS
+        .filter((b) => !ids.has(b.id))
+        .slice()
+        .sort((a, b) => b.rating - a.rating);
+
+      for (const b of fill) {
+        if (result.length >= 3) break;
+        ids.add(b.id);
+        result.push(b);
+      }
+    }
+
+    return result.slice(0, 3);
+  }, [mbti]);
+
+  const completedRecords = useMemo(() => {
+    return readingRecords
+      .filter((r) => r.status === "completed")
+      .slice()
+      .sort((a, b) => parseDateMs((b as any).endDate) - parseDateMs((a as any).endDate));
+  }, [readingRecords]);
+
   const stats = getReadingStats();
+  const completed = stats.completedBooks || 5;
 
-  const [evaluationOpen, setEvaluationOpen] = useState(false);
-  const [evaluationBookId, setEvaluationBookId] = useState<string | null>(null);
+  const recentBooks = useMemo(() => {
+    // 실제 기록이 있으면 최근 5권을 사용, 없으면 데모용으로 샘플 상위 5권을 노출
+    const ids = new Set<string>();
+    const result: Book[] = [];
 
-  const openEvaluation = (bookId: string) => {
-    setEvaluationBookId(bookId);
-    setEvaluationOpen(true);
-  };
+    for (const r of completedRecords) {
+      const b = getBookById(r.bookId);
+      if (!b) continue;
+      if (ids.has(b.id)) continue;
+      ids.add(b.id);
+      result.push(b);
+      if (result.length >= 5) break;
+    }
 
-  const submitEvaluation = (evaluation: Exclude<BookEvaluation, "skip">) => {
-    if (!evaluationBookId) return;
-    evaluateBook(evaluationBookId, evaluation);
-    setEvaluationOpen(false);
-    setEvaluationBookId(null);
-  };
+    if (result.length < 5) {
+      const fill = SAMPLE_BOOKS
+        .filter((b) => !ids.has(b.id))
+        .slice()
+        .sort((a, b) => b.rating - a.rating);
+      for (const b of fill) {
+        result.push(b);
+        if (result.length >= 5) break;
+      }
+    }
+
+    return result.slice(0, 5);
+  }, [completedRecords]);
+
+  const currentMonthCount = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const count = readingRecords.filter((r) => {
+      if (r.status !== "completed") return false;
+      const t = parseDateMs((r as any).endDate);
+      if (!t) return false;
+      const d = new Date(t);
+      return d.getFullYear() === y && d.getMonth() === m;
+    }).length;
+    return count || 2;
+  }, [readingRecords]);
 
   return (
     <div className="bg-background text-foreground pb-20">
       <AppHeader variant="logo-actions" showNotificationDot avatarText={nickname.charAt(0)} />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
-        {/* Welcome */}
-        <div className="mb-6">
-          <h1 className="text-xl font-bold">안녕하세요, {nickname}님! 📚</h1>
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 lg:max-w-4xl">
+        {/* Greeting */}
+        <section className="mb-4">
+          <h1 className="text-2xl font-extrabold tracking-tight">
+            {nickname}님은 <span className="text-primary">{mbti}</span>형 👋
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">"{mbtiTitle}"</p>
+        </section>
 
-          <div className="mt-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="mb-1 flex items-center gap-2">
-                  <span>🔮</span>
-                  <span className="font-bold">
-                    당신은 <span className="font-extrabold">{mbti}</span>형
-                  </span>
-                </div>
-                <p className="text-sm opacity-90">"{mbtiTitle}"</p>
-              </div>
-              <Link href="/test/result" className="text-sm opacity-75 transition hover:opacity-100">
-                유형 다시보기 &gt;
-              </Link>
+        {/* Search */}
+        <section className="mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-1 items-center gap-2 rounded-full bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200">
+              <Search className="h-5 w-5 text-gray-400" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="책 제목이나 저자를 검색하세요"
+                className="h-6 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+              />
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-600">
+                <Mic className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        <section className="mb-8">
-          <h2 className="mb-2 flex items-center gap-2 text-lg font-bold">
-            <span>✨</span>
-            <span>오늘의 맞춤 추천</span>
-          </h2>
-          <p className="mb-4 text-sm text-gray-500">{mbti}형인 당신을 위해 엄선한 3권이에요</p>
-
-          <div className="space-y-4">
-            {recommendations.map((book, idx) => {
-              const badge = BADGES[idx] ?? BADGES[0];
-              const explain = EXPLAINS[idx] ?? EXPLAINS[0];
-              const inWishlist = isInWishlist(book.id);
-
-              return (
-                <div key={book.id} className="rounded-2xl bg-white p-5 shadow-md">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className={`rounded px-2 py-1 text-xs font-bold ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <Link href={`/book/${book.id}`} className="flex-shrink-0">
-                      <div
-                        className={`flex h-32 w-24 items-center justify-center rounded-lg bg-gradient-to-b shadow-md ${coverGradientClass(
-                          book
-                        )}`}
-                      >
-                        <span className="text-4xl">{book.emoji ?? "📘"}</span>
-                      </div>
-                    </Link>
-
-                    <div className="flex-1">
-                      <Link href={`/book/${book.id}`} className="block">
-                        <h3 className="text-lg font-bold">{book.title}</h3>
-                        <p className="text-sm text-gray-500">
-                          {book.author} · {book.publisher} · {formatYear(book)}
-                        </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                          <span>⭐ {book.rating.toFixed(1)}</span>
-                          <span>·</span>
-                          <span>{book.pages}페이지</span>
-                          <span>·</span>
-                          <span>{book.category}</span>
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className={`mt-4 rounded-xl p-3 ${explain.className}`}>
-                    <p className="text-sm text-gray-600">{explain.text}</p>
-                  </div>
-
-                  <div className="mt-4 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => addToWishlist(book.id)}
-                      disabled={inWishlist}
-                      className={`flex-1 rounded-xl border-2 py-3 font-medium transition ${
-                        inWishlist
-                          ? "border-gray-300 text-gray-400"
-                          : "border-primary text-primary hover:bg-indigo-50"
-                      }`}
-                    >
-                      <span className="inline-flex items-center justify-center gap-2">
-                        <span>{inWishlist ? "💖" : "❤️"}</span>
-                        <span>{inWishlist ? "추가됨" : "위시리스트"}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openEvaluation(book.id)}
-                      className="flex-1 rounded-xl bg-primary py-3 font-medium text-white transition hover:bg-indigo-700"
-                    >
-                      <span className="inline-flex items-center justify-center gap-2">
-                        <span>✅</span>
-                        <span>읽었어요</span>
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 rounded-full bg-white text-gray-500 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
           </div>
         </section>
 
-        {/* Reading Stats */}
-        <section>
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-            <span>📊</span>
-            <span>나의 독서 현황</span>
-          </h2>
-          <div className="grid grid-cols-3 gap-4">
-            <Link href="/reading-history" className="rounded-xl bg-white p-4 text-center shadow-sm transition hover:shadow-md">
-              <p className="mb-1 text-sm text-gray-500">읽은 책</p>
-              <p className="text-2xl font-bold text-primary">{stats.completedBooks || 5}권</p>
-            </Link>
-            <Link href="/wishlist" className="rounded-xl bg-white p-4 text-center shadow-sm transition hover:shadow-md">
-              <p className="mb-1 text-sm text-gray-500">위시리스트</p>
-              <p className="text-2xl font-bold text-secondary">{wishlist.length || 3}권</p>
-            </Link>
-            <div className="rounded-xl bg-white p-4 text-center shadow-sm">
-              <p className="mb-1 text-sm text-gray-500">이번 달</p>
-              <p className="text-2xl font-bold text-accent">2권</p>
+        {/* Recommendations */}
+        <section className="mb-5">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold">당신을 위한 추천</h2>
+              <p className="mt-1 text-sm text-gray-500">{mbti}형 맞춤 도서 3권</p>
             </div>
+            <Link href="/recommend" className="relative z-10 text-sm text-gray-600 hover:underline">
+              전체 보기 &gt;
+            </Link>
+          </div>
+
+          <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 pr-8 snap-x snap-mandatory scroll-px-4 touch-pan-x">
+            {recommendations.map((book) => (
+              <Link key={book.id} href={`/book/${book.id}`} className="w-[168px] flex-shrink-0 snap-start">
+                <Card className="rounded-2xl border-0 bg-white p-3 shadow-sm">
+                  <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-gray-100">
+                    {book.coverImage ? (
+                      <img
+                        src={book.coverImage}
+                        alt={book.title}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${coverGradientClass(
+                          book
+                        )}`}
+                      >
+                        <span className="text-5xl">{book.emoji ?? "📘"}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="truncate text-sm font-bold">{book.title}</p>
+                    <p className="truncate text-xs text-gray-500">{bookSubtitle(book)}</p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          <Link href="/recommend" className="mt-4 block">
+            <Button className="h-14 w-full rounded-full bg-sky-500 text-lg font-bold hover:bg-sky-600">
+              추천 받기
+            </Button>
+          </Link>
+        </section>
+
+        {/* Recent Reads */}
+        <section className="mt-6">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold">최근 읽은 책</h2>
+              <p className="mt-1 text-sm text-gray-500">{completed}권</p>
+            </div>
+            <Link href="/reading-history" className="relative z-10 text-sm text-gray-600 hover:underline">
+              전체 보기 &gt;
+            </Link>
+          </div>
+
+          <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 pr-8 snap-x snap-mandatory scroll-px-4 touch-pan-x">
+            {recentBooks.map((book) => (
+              <Link key={book.id} href={`/book/${book.id}`} className="w-[260px] flex-shrink-0 snap-start">
+                <Card className="overflow-hidden rounded-2xl border-0 bg-white shadow-sm">
+                  <div className="aspect-[3/2] w-full overflow-hidden bg-white px-3 py-2">
+                    {book.coverImage ? (
+                      <img
+                        src={book.coverImage}
+                        alt={book.title}
+                        className="h-full w-full rounded-xl object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-b ${coverGradientClass(
+                          book
+                        )}`}
+                      >
+                        <span className="text-7xl">{book.emoji ?? "📘"}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <p className="font-bold">{book.title}</p>
+                    <p className="text-sm text-gray-500">{bookSubtitle(book)}</p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Reading Stats (Bottom) */}
+        <section className="mt-8 -mx-4 bg-sky-50/70 px-4 py-6">
+          <h2 className="text-xl font-extrabold text-slate-900">나의 독서 현황</h2>
+
+          <div className="mt-6 grid grid-cols-3 gap-5">
+            <Card className="rounded-3xl border-0 bg-white p-6 text-center shadow-[0_10px_22px_rgba(15,23,42,0.10)]">
+              <p className="text-sm font-semibold text-slate-400">읽은 책</p>
+              <p className="-mt-[10px] text-4xl font-extrabold leading-none text-blue-600">{completed}권</p>
+            </Card>
+            <Card className="rounded-3xl border-0 bg-white p-6 text-center shadow-[0_10px_22px_rgba(15,23,42,0.10)]">
+              <p className="text-sm font-semibold text-slate-400">위시리스트</p>
+              <p className="-mt-[10px] text-4xl font-extrabold leading-none text-sky-500">{wishlist.length || 3}권</p>
+            </Card>
+            <Card className="rounded-3xl border-0 bg-white p-6 text-center shadow-[0_10px_22px_rgba(15,23,42,0.10)]">
+              <p className="text-sm font-semibold text-slate-400">이번 달</p>
+              <p className="-mt-[10px] text-4xl font-extrabold leading-none text-amber-500">{currentMonthCount}권</p>
+            </Card>
           </div>
         </section>
       </main>
 
       <BottomNav />
-
-      {/* Evaluation Modal */}
-      <Dialog open={evaluationOpen} onOpenChange={setEvaluationOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-center">📖 독서 완료!</DialogTitle>
-          </DialogHeader>
-
-          <div className="text-center">
-            <p className="mb-4 text-gray-600">이 책은 어떠셨나요?</p>
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                onClick={() => submitEvaluation("like")}
-                className="flex-1 bg-indigo-50 text-foreground hover:bg-indigo-100"
-                variant="secondary"
-              >
-                <span className="mr-2 text-2xl">👍</span>
-                좋았어요
-              </Button>
-              <Button
-                type="button"
-                onClick={() => submitEvaluation("dislike")}
-                className="flex-1 bg-gray-50 text-foreground hover:bg-gray-100"
-                variant="secondary"
-              >
-                <span className="mr-2 text-2xl">👎</span>
-                별로예요
-              </Button>
-            </div>
-            <p className="mt-4 text-xs text-gray-400">💡 평가를 남기면 더 정확한 추천을 받을 수 있어요!</p>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

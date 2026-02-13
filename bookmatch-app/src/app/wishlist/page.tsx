@@ -27,7 +27,7 @@ function coverGradientClass(book: Book) {
 }
 
 export default function WishlistPage() {
-  const { wishlist, removeFromWishlist, evaluateBook } = useBookStore();
+  const { wishlist, removeFromWishlist, evaluateBook, getBookFeedback } = useBookStore();
 
   const items = useMemo(() => {
     return wishlist
@@ -54,7 +54,7 @@ export default function WishlistPage() {
     <div className="bg-background text-foreground pb-20">
       <AppHeader variant="logo-actions" />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 lg:max-w-4xl">
         <div className="mb-6">
           <h1 className="flex items-center gap-2 text-xl font-bold">
             <span>❤️</span>
@@ -76,16 +76,31 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map(({ item, book }) => (
-              <div key={item.id} className="rounded-2xl bg-white p-5 shadow-md">
-                <div className="flex gap-4">
+            {items.map(({ item, book }) => {
+              const feedback = getBookFeedback(book.id);
+
+              return (
+                <div key={item.id} className="rounded-2xl bg-white p-5 shadow-md">
+                  <div className="flex gap-4">
                   <Link href={`/book/${book.id}`} className="flex-shrink-0">
-                    <div
-                      className={`flex h-28 w-20 items-center justify-center rounded-lg bg-gradient-to-b shadow-md ${coverGradientClass(
-                        book
-                      )}`}
-                    >
-                      <span className="text-3xl">{book.emoji ?? "📘"}</span>
+                    <div className="h-28 w-20 overflow-hidden rounded-lg bg-gray-100 shadow-md">
+                      {book.coverImage ? (
+                        <img
+                          src={book.coverImage}
+                          alt={book.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${coverGradientClass(
+                            book
+                          )}`}
+                        >
+                          <span className="text-3xl">{book.emoji ?? "📘"}</span>
+                        </div>
+                      )}
                     </div>
                   </Link>
                   <div className="flex-1">
@@ -118,11 +133,28 @@ export default function WishlistPage() {
                   <button
                     type="button"
                     onClick={() => openEvaluation(book.id)}
-                    className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                    disabled={!!feedback}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium text-white transition ${
+                      feedback ? "bg-gray-300" : "bg-primary hover:bg-indigo-700"
+                    }`}
                   >
                     <span className="inline-flex items-center justify-center gap-1">
-                      <span>✅</span>
-                      <span>독서완료</span>
+                      {feedback === "like" ? (
+                        <>
+                          <span>👍</span>
+                          <span>좋았어요</span>
+                        </>
+                      ) : feedback === "dislike" ? (
+                        <>
+                          <span>👎</span>
+                          <span>별로예요</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>✅</span>
+                          <span>독서완료</span>
+                        </>
+                      )}
                     </span>
                   </button>
                   <button
@@ -143,7 +175,8 @@ export default function WishlistPage() {
                   </Link>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

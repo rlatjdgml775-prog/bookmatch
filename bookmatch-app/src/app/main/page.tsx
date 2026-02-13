@@ -179,7 +179,7 @@ export default function MainPage() {
               <h2 className="text-xl font-extrabold">당신을 위한 추천</h2>
               <p className="mt-1 text-sm text-gray-500">{mbti}형 맞춤 도서 3권</p>
             </div>
-            <Link href="/recommend" className="relative z-10 text-sm text-gray-600 hover:underline">
+            <Link href="/recommend" className="text-sm text-gray-600 hover:underline">
               전체 보기 &gt;
             </Link>
           </div>
@@ -230,7 +230,7 @@ export default function MainPage() {
               <h2 className="text-xl font-extrabold">최근 읽은 책</h2>
               <p className="mt-1 text-sm text-gray-500">{completed}권</p>
             </div>
-            <Link href="/reading-history" className="relative z-10 text-sm text-gray-600 hover:underline">
+            <Link href="/reading-history" className="text-sm text-gray-600 hover:underline">
               전체 보기 &gt;
             </Link>
           </div>
